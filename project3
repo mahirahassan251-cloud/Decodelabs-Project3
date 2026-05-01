@@ -1,0 +1,121 @@
+import java.util.*;
+
+public class TechStackRecommender {
+
+    static Map<String, List<String>> jobRoles = new HashMap<>();
+    static Set<String> vocabulary = new LinkedHashSet<>();
+
+    @SuppressWarnings("resource")
+	public static void main(String[] args) {
+        buildDataset();
+        buildVocabulary();
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("=== Tech Stack Recommender ===");
+        System.out.println("Enter at least 3 skills (comma-separated):");
+        System.out.print("> ");
+        String input = scanner.nextLine();
+
+        List<String> userSkills = parseInput(input);
+
+        if (userSkills.size() < 3) {
+            System.out.println("Please enter at least 3 skills.");
+            return;
+        }
+
+        Map<String, Double> tfidfUser = buildTFIDFVector(userSkills);
+        Map<String, Double> scores = new HashMap<>();
+
+        for (Map.Entry<String, List<String>> entry : jobRoles.entrySet()) {
+            Map<String, Double> tfidfItem = buildTFIDFVector(entry.getValue());
+            double score = cosineSimilarity(tfidfUser, tfidfItem);
+            scores.put(entry.getKey(), score);
+        }
+
+        List<Map.Entry<String, Double>> sorted = new ArrayList<>(scores.entrySet());
+        sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+
+        System.out.println("\nTop 3 Recommended Career Paths:");
+        System.out.println("----------------------------------");
+        for (int i = 0; i < 3 && i < sorted.size(); i++) {
+            String role = sorted.get(i).getKey();
+            double score = sorted.get(i).getValue();
+            System.out.printf("%d. %-30s Score: %.4f%n", i + 1, role, score);
+        }
+
+        scanner.close();
+    }
+
+    static void buildDataset() {
+        jobRoles.put("Data Scientist", Arrays.asList("python", "sql", "machine_learning", "statistics", "pandas", "numpy", "data_analysis"));
+        jobRoles.put("Backend Developer", Arrays.asList("java", "python", "sql", "apis", "spring", "databases", "rest"));
+        jobRoles.put("Frontend Developer", Arrays.asList("javascript", "html", "css", "react", "typescript", "ui", "web_design"));
+        jobRoles.put("DevOps Engineer", Arrays.asList("aws", "docker", "kubernetes", "ci_cd", "linux", "automation", "cloud"));
+        jobRoles.put("Cloud Architect", Arrays.asList("aws", "azure", "cloud", "networking", "infrastructure", "automation", "security"));
+        jobRoles.put("Machine Learning Engineer", Arrays.asList("python", "machine_learning", "tensorflow", "pytorch", "deep_learning", "algorithms", "numpy"));
+        jobRoles.put("Mobile Developer", Arrays.asList("android", "ios", "flutter", "kotlin", "swift", "mobile", "java"));
+        jobRoles.put("Cybersecurity Analyst", Arrays.asList("networking", "security", "linux", "ethical_hacking", "cryptography", "firewalls", "risk_assessment"));
+        jobRoles.put("Database Administrator", Arrays.asList("sql", "mysql", "postgresql", "mongodb", "databases", "query_optimization", "backup"));
+        jobRoles.put("Full Stack Developer", Arrays.asList("javascript", "python", "sql", "react", "nodejs", "apis", "databases"));
+        jobRoles.put("AI Engineer", Arrays.asList("python", "machine_learning", "deep_learning", "nlp", "tensorflow", "algorithms", "data_analysis"));
+        jobRoles.put("Systems Administrator", Arrays.asList("linux", "networking", "automation", "bash", "cloud", "monitoring", "security"));
+    }
+
+    static void buildVocabulary() {
+        for (List<String> skills : jobRoles.values()) {
+            vocabulary.addAll(skills);
+        }
+    }
+
+    static List<String> parseInput(String input) {
+        List<String> skills = new ArrayList<>();
+        String[] parts = input.split(",");
+        for (String part: parts) {
+            String cleaned = part.trim().toLowerCase().replace(" ", "_");
+            if (!cleaned.isEmpty()) {
+                skills.add(cleaned);
+            }
+        }
+        return skills;
+    }
+
+    static Map<String, Double> buildTFIDFVector(List<String> terms) {
+        Map<String, Double> vector = new HashMap<>();
+        int totalTerms = terms.size();
+        int totalDocuments = jobRoles.size();
+
+        Map<String, Integer> termCount = new HashMap<>();
+        for (String term: terms) {
+            termCount.put(term, termCount.getOrDefault(term, 0) + 1);
+        }
+
+        for (String term: vocabulary) {
+            double tf = termCount.getOrDefault(term, 0) / (double) totalTerms;
+            int docFrequency = 0;
+            for (List<String> doc : jobRoles.values()) {
+                if (doc.contains(term)) docFrequency++;
+            }
+            double idf = (docFrequency == 0) ? 0 : Math.log((double) totalDocuments / docFrequency);
+            vector.put(term, tf * idf);
+        }
+
+        return vector;
+    }
+
+    static double cosineSimilarity(Map<String, Double> vecA, Map<String, Double> vecB) {
+        double dotProduct = 0.0;
+        double magnitudeA = 0.0;
+        double magnitudeB = 0.0;
+
+        for (String term: vocabulary) {
+            double a = vecA.getOrDefault(term, 0.0);
+            double b = vecB.getOrDefault(term, 0.0);
+            dotProduct += a * b;
+            magnitudeA += a * a;
+            magnitudeB += b * b;
+        }
+
+        if (magnitudeA == 0 || magnitudeB == 0) return 0.0;
+        return dotProduct / (Math.sqrt(magnitudeA) * Math.sqrt(magnitudeB));
+    }
+}
